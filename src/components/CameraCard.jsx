@@ -1,82 +1,56 @@
-import { useRef, useState } from "react";
+import { useState } from "react";
 import { motion } from "framer-motion";
+import {
+  Camera,
+  CameraResultType,
+  CameraSource,
+} from "@capacitor/camera";
 
 function CameraCard() {
-  const videoRef = useRef(null);
-  const canvasRef = useRef(null);
-
-  const [stream, setStream] = useState(null);
   const [photo, setPhoto] = useState(null);
-  const [facingMode, setFacingMode] = useState("user");
+  const [usingFrontCamera, setUsingFrontCamera] =
+    useState(false);
 
-  const startCamera = async (mode = facingMode) => {
+  const requestPermission = async () => {
     try {
-      if (stream) {
-        stream.getTracks().forEach((track) => track.stop());
-      }
+      const permissions =
+        await Camera.requestPermissions();
 
-      const mediaStream =
-        await navigator.mediaDevices.getUserMedia({
-          video: {
-            facingMode: mode,
-          },
-          audio: false,
-        });
-
-      videoRef.current.srcObject = mediaStream;
-      setStream(mediaStream);
+      return permissions.camera === "granted";
     } catch (error) {
       console.error(error);
-      alert("Unable to access camera");
+      return false;
     }
   };
 
-  const stopCamera = () => {
-    if (stream) {
-      stream.getTracks().forEach((track) => track.stop());
-      setStream(null);
-    }
+  const takePicture = async () => {
+    try {
+      const granted = await requestPermission();
 
-    if (videoRef.current) {
-      videoRef.current.srcObject = null;
+      if (!granted) {
+        alert("Camera permission is required.");
+        return;
+      }
+
+      const image = await Camera.getPhoto({
+        quality: 90,
+        allowEditing: false,
+        resultType: CameraResultType.DataUrl,
+        source: CameraSource.Camera,
+        presentationStyle: "fullscreen",
+        direction: usingFrontCamera
+          ? "FRONT"
+          : "REAR",
+      });
+
+      setPhoto(image.dataUrl);
+    } catch (error) {
+      console.error(error);
     }
   };
 
-  const flipCamera = async () => {
-    const newMode =
-      facingMode === "user"
-        ? "environment"
-        : "user";
-
-    setFacingMode(newMode);
-
-    await startCamera(newMode);
-  };
-
-  const takePicture = () => {
-    const video = videoRef.current;
-    const canvas = canvasRef.current;
-
-    if (!video || !canvas) return;
-
-    canvas.width = video.videoWidth;
-    canvas.height = video.videoHeight;
-
-    const context = canvas.getContext("2d");
-
-    context.drawImage(
-      video,
-      0,
-      0,
-      canvas.width,
-      canvas.height
-    );
-
-    const imageData = canvas.toDataURL(
-      "image/png"
-    );
-
-    setPhoto(imageData);
+  const flipCamera = () => {
+    setUsingFrontCamera((prev) => !prev);
   };
 
   const downloadPhoto = () => {
@@ -85,11 +59,15 @@ function CameraCard() {
     const link = document.createElement("a");
 
     link.href = photo;
-    link.download = `photo-${Date.now()}.png`;
+    link.download = `photo-${Date.now()}.jpg`;
 
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
+  };
+
+  const clearPhoto = () => {
+    setPhoto(null);
   };
 
   return (
@@ -103,36 +81,26 @@ function CameraCard() {
         Camera Studio
       </h3>
 
-      <div className="d-flex justify-content-center gap-2 flex-wrap mb-3">
+      <div className="d-flex justify-content-center gap-2 flex-wrap mb-4">
 
-        {/* Open Camera */}
         <button
           className="btn btn-success"
-          onClick={() => startCamera()}
+          onClick={takePicture}
         >
-          <i className="bi bi-camera-video-fill me-2"></i>
-          Open
+          <i className="bi bi-camera-fill me-2"></i>
+          Take Picture
         </button>
 
-        {/* Flip Camera */}
         <button
           className="btn btn-primary flip-btn"
           onClick={flipCamera}
         >
           <i className="bi bi-arrow-repeat me-2"></i>
-          Flip
+          {usingFrontCamera
+            ? "Front Camera"
+            : "Rear Camera"}
         </button>
 
-        {/* Capture */}
-        <button
-          className="btn btn-info"
-          onClick={takePicture}
-        >
-          <i className="bi bi-record-circle-fill me-2"></i>
-          Capture
-        </button>
-
-        {/* Download */}
         <button
           className="btn btn-warning"
           onClick={downloadPhoto}
@@ -142,37 +110,27 @@ function CameraCard() {
           Save
         </button>
 
-        {/* Close */}
         <button
           className="btn btn-danger"
-          onClick={stopCamera}
+          onClick={clearPhoto}
+          disabled={!photo}
         >
-          <i className="bi bi-camera-video-off-fill me-2"></i>
-          Close
+          <i className="bi bi-trash me-2"></i>
+          Clear
         </button>
 
       </div>
 
-      <video
-        ref={videoRef}
-        autoPlay
-        playsInline
-        muted
-        className="camera-preview"
-      />
+      {!photo ? (
+        <div className="camera-placeholder text-center">
+          <i className="bi bi-camera2 display-1"></i>
 
-      <canvas
-        ref={canvasRef}
-        style={{ display: "none" }}
-      />
-
-      {photo && (
-        <div className="mt-4">
-          <h5 className="text-center mb-3">
-            <i className="bi bi-image-fill me-2"></i>
-            Captured Photo
-          </h5>
-
+          <p className="mt-3">
+            Tap "Take Picture" to open camera
+          </p>
+        </div>
+      ) : (
+        <div className="text-center">
           <img
             src={photo}
             alt="Captured"
