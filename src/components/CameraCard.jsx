@@ -4,66 +4,46 @@ import {
   Camera,
   CameraResultType,
   CameraSource,
+  CameraDirection,
 } from "@capacitor/camera";
 
 function CameraCard() {
   const [photo, setPhoto] = useState(null);
-  const [usingFrontCamera, setUsingFrontCamera] =
-    useState(false);
+  const [cameraDirection, setCameraDirection] =
+    useState(CameraDirection.Rear);
 
-  const requestPermission = async () => {
+  const takePicture = async () => {
     try {
       const permissions =
         await Camera.requestPermissions();
 
-      return permissions.camera === "granted";
-    } catch (error) {
-      console.error(error);
-      return false;
-    }
-  };
-
-  const takePicture = async () => {
-    try {
-      const granted = await requestPermission();
-
-      if (!granted) {
-        alert("Camera permission is required.");
+      if (permissions.camera !== "granted") {
+        alert("Camera permission required");
         return;
       }
 
       const image = await Camera.getPhoto({
-        quality: 90,
+        quality: 95,
         allowEditing: false,
         resultType: CameraResultType.DataUrl,
         source: CameraSource.Camera,
-        presentationStyle: "fullscreen",
-        direction: usingFrontCamera
-          ? "FRONT"
-          : "REAR",
+        direction: cameraDirection,
+        saveToGallery: true,
       });
 
       setPhoto(image.dataUrl);
     } catch (error) {
       console.error(error);
+      alert("Failed to capture image");
     }
   };
 
   const flipCamera = () => {
-    setUsingFrontCamera((prev) => !prev);
-  };
-
-  const downloadPhoto = () => {
-    if (!photo) return;
-
-    const link = document.createElement("a");
-
-    link.href = photo;
-    link.download = `photo-${Date.now()}.jpg`;
-
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
+    setCameraDirection((prev) =>
+      prev === CameraDirection.Rear
+        ? CameraDirection.Front
+        : CameraDirection.Rear
+    );
   };
 
   const clearPhoto = () => {
@@ -75,6 +55,7 @@ function CameraCard() {
       className="glass-card mt-4"
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
+      transition={{ duration: 0.4 }}
     >
       <h3 className="text-center mb-4">
         <i className="bi bi-camera-fill me-2"></i>
@@ -82,7 +63,6 @@ function CameraCard() {
       </h3>
 
       <div className="d-flex justify-content-center gap-2 flex-wrap mb-4">
-
         <button
           className="btn btn-success"
           onClick={takePicture}
@@ -96,18 +76,9 @@ function CameraCard() {
           onClick={flipCamera}
         >
           <i className="bi bi-arrow-repeat me-2"></i>
-          {usingFrontCamera
-            ? "Front Camera"
-            : "Rear Camera"}
-        </button>
-
-        <button
-          className="btn btn-warning"
-          onClick={downloadPhoto}
-          disabled={!photo}
-        >
-          <i className="bi bi-download me-2"></i>
-          Save
+          {cameraDirection === CameraDirection.Rear
+            ? "Rear Camera"
+            : "Front Camera"}
         </button>
 
         <button
@@ -115,10 +86,9 @@ function CameraCard() {
           onClick={clearPhoto}
           disabled={!photo}
         >
-          <i className="bi bi-trash me-2"></i>
+          <i className="bi bi-trash-fill me-2"></i>
           Clear
         </button>
-
       </div>
 
       {!photo ? (
@@ -126,8 +96,12 @@ function CameraCard() {
           <i className="bi bi-camera2 display-1"></i>
 
           <p className="mt-3">
-            Tap "Take Picture" to open camera
+            Capture a photo to preview it here
           </p>
+
+          <small className="text-muted">
+            Photos are automatically saved to gallery
+          </small>
         </div>
       ) : (
         <div className="text-center">
@@ -136,6 +110,12 @@ function CameraCard() {
             alt="Captured"
             className="captured-photo"
           />
+
+          <div className="mt-3">
+            <span className="badge bg-success">
+              Saved to Gallery
+            </span>
+          </div>
         </div>
       )}
     </motion.div>
